@@ -1,0 +1,30 @@
+#include <HX711.h>
+
+#define DT2   35
+#define SCK2  22
+
+HX711 scale2;
+
+float calibrationFactor2 = -700.00;
+
+void setup() {
+  Serial.begin(115200);
+
+  scale2.begin(DT2, SCK2);
+
+  delay(3000);
+
+  scale2.tare();                 // nol otomatis
+  scale2.set_scale(calibrationFactor2);
+}
+
+void loop() {
+
+  float berat2 = scale2.get_units(10);
+
+  Serial.print("LC2 : ");
+  Serial.print(berat2, 2);
+  Serial.println(" g");
+
+  delay(500);
+}

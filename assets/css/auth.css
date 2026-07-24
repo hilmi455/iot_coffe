@@ -1,0 +1,536 @@
+/* =========================
+   GLOBAL
+========================= */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+:root{
+    --bg:#071207;
+    --card:rgba(15,30,15,0.72);
+    --border:rgba(255,255,255,0.05);
+    --primary:#75ff43;
+    --text:#ffffff;
+    --muted:#8d9a8d;
+}
+
+html,
+body{
+    width:100%;
+    min-height:100vh;
+    overflow-x:hidden;
+}
+
+body{
+    background:var(--bg);
+    color:var(--text);
+    position:relative;
+}
+
+/* =========================
+   BACKGROUND EFFECT
+========================= */
+
+body::before{
+    content:"";
+    position:absolute;
+
+    width:850px;
+    height:850px;
+
+    background:
+    radial-gradient(
+    circle,
+    rgba(117,255,67,0.10) 0%,
+    transparent 70%
+    );
+
+    top:50%;
+    left:50%;
+
+    transform:translate(-50%,-50%);
+
+    z-index:0;
+
+    pointer-events:none;
+}
+
+body::after{
+    content:"";
+    position:absolute;
+    inset:0;
+
+    background:
+    repeating-linear-gradient(
+    90deg,
+    rgba(117,255,67,0.02),
+    rgba(117,255,67,0.02) 1px,
+    transparent 1px,
+    transparent 85px
+    );
+
+    z-index:0;
+
+    pointer-events:none;
+}
+
+/* =========================
+   NAVBAR
+========================= */
+
+.navbar{
+    width:100%;
+    height:78px;
+
+    padding:0 24px;
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    border-bottom:1px solid rgba(255,255,255,0.03);
+
+    position:relative;
+    z-index:5;
+}
+
+/* =========================
+   BRAND
+========================= */
+
+.brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.brand-icon{
+    width:34px;
+    height:34px;
+
+    border-radius:10px;
+
+    background:rgba(117,255,67,0.12);
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    color:var(--primary);
+    font-size:14px;
+}
+
+.brand-text{
+    font-size:18px;
+    font-weight:700;
+}
+
+.brand-text span{
+    color:var(--primary);
+    font-size:14px;
+    margin-left:3px;
+    font-weight:500;
+}
+
+/* =========================
+   RIGHT NAV
+========================= */
+
+.nav-right{
+    display:flex;
+    align-items:center;
+    gap:8px;
+
+    color:#98a498;
+    font-size:12px;
+
+    position:relative;
+    z-index:10;
+}
+
+.nav-right a{
+    color:var(--primary);
+    text-decoration:none;
+    font-weight:600;
+
+    position:relative;
+    z-index:11;
+}
+
+/* =========================
+   MAIN WRAPPER
+========================= */
+
+.main-wrapper,
+.wrapper{
+    width:100%;
+    min-height:calc(100vh - 78px);
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    padding:40px 20px;
+
+    position:relative;
+    z-index:2;
+}
+
+/* =========================
+   CARD
+========================= */
+
+.login-box,
+.register-card,
+.reset-card{
+    width:100%;
+    max-width:520px;
+
+    padding:34px;
+
+    border-radius:22px;
+
+    background:var(--card);
+
+    border:1px solid var(--border);
+
+    backdrop-filter:blur(14px);
+
+    position:relative;
+
+    box-shadow:
+    0 0 40px rgba(0,0,0,0.45),
+    0 0 80px rgba(117,255,67,0.03);
+}
+
+/* =========================
+   TITLE
+========================= */
+
+.login-box h1,
+.login-box h2,
+.register-card h1,
+.reset-card h1{
+    font-size:38px;
+    font-weight:700;
+
+    margin-bottom:28px;
+}
+
+/* =========================
+   INPUT GROUP
+========================= */
+
+.input-group{
+    margin-bottom:20px;
+}
+
+.input-group label{
+    display:block;
+
+    margin-bottom:9px;
+
+    color:#b3beb3;
+
+    font-size:12px;
+    font-weight:500;
+}
+
+/* =========================
+   INPUT BOX
+========================= */
+
+.input-box{
+    position:relative;
+    width:100%;
+}
+
+.input-box input{
+    width:100%;
+    height:52px;
+
+    border-radius:12px;
+
+    border:1px solid rgba(255,255,255,0.05);
+
+    background:rgba(255,255,255,0.02);
+
+    padding:0 48px 0 16px;
+
+    color:white;
+    font-size:14px;
+
+    outline:none;
+    transition:0.3s;
+
+    display:block;
+}
+
+.input-box input:focus{
+    border-color:rgba(117,255,67,0.25);
+
+    box-shadow:
+    0 0 14px rgba(117,255,67,0.08);
+}
+
+.input-box input::placeholder{
+    color:#708070;
+}
+
+.input-box i{
+    position:absolute;
+
+    top:50%;
+    right:16px;
+
+    transform:translateY(-50%);
+
+    color:#7f8b7f;
+
+    font-size:14px;
+}
+
+/* =========================
+   PASSWORD ROW
+========================= */
+
+.password-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+
+    width:100%;
+}
+
+/* =========================
+   OPTIONS
+========================= */
+
+.options{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    margin-top:6px;
+    margin-bottom:18px;
+
+    gap:10px;
+}
+
+.options a{
+    color:var(--primary);
+    text-decoration:none;
+    font-size:13px;
+
+    position:relative;
+    z-index:11;
+}
+
+/* =========================
+   REMEMBER
+========================= */
+
+.remember{
+    margin-top:8px;
+
+    display:flex;
+    align-items:center;
+    gap:10px;
+
+    color:#92a092;
+    font-size:13px;
+
+    position:relative;
+    z-index:10;
+}
+
+.remember input{
+    accent-color:var(--primary);
+}
+
+/* =========================
+   BUTTON
+========================= */
+
+.btn{
+    width:100%;
+    height:54px;
+
+    border:none;
+    border-radius:12px;
+
+    background:var(--primary);
+    color:black;
+
+    font-size:16px;
+    font-weight:700;
+
+    cursor:pointer;
+
+    margin-top:24px;
+
+    transition:0.3s;
+
+    display:block;
+
+    box-shadow:
+    0 0 25px rgba(117,255,67,0.18);
+}
+
+.btn:hover{
+    transform:translateY(-2px);
+
+    box-shadow:
+    0 0 35px rgba(117,255,67,0.28);
+}
+
+/* =========================
+   SIGNUP / BACK LINK
+========================= */
+
+.signup,
+.back-login{
+    margin-top:20px;
+
+    text-align:center;
+
+    color:#93a093;
+    font-size:13px;
+
+    position:relative;
+    z-index:10;
+}
+
+.signup a,
+.back-login a{
+    color:var(--primary);
+    text-decoration:none;
+    font-weight:600;
+
+    position:relative;
+    z-index:11;
+}
+
+/* =========================
+   PASSWORD INFO
+========================= */
+
+.password-info{
+    display:flex;
+    justify-content:space-between;
+
+    margin-top:8px;
+
+    color:#839083;
+    font-size:11px;
+}
+
+/* =========================
+   TOP ICON
+========================= */
+
+.top-icon{
+    width:70px;
+    height:70px;
+
+    margin:0 auto 20px;
+
+    border-radius:18px;
+
+    background:rgba(117,255,67,0.08);
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
+    color:var(--primary);
+    font-size:24px;
+}
+
+/* =========================
+   SUBTITLE
+========================= */
+
+.subtitle{
+    color:#91a091;
+    font-size:14px;
+
+    margin-bottom:24px;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media(max-width:768px){
+
+    .login-box,
+    .register-card,
+    .reset-card{
+        padding:28px;
+    }
+
+    .login-box h1,
+    .login-box h2,
+    .register-card h1,
+    .reset-card h1{
+        font-size:32px;
+    }
+
+}
+
+@media(max-width:580px){
+
+    .navbar{
+        padding:0 18px;
+    }
+
+    .main-wrapper,
+    .wrapper{
+        padding:20px 16px;
+    }
+
+    .login-box,
+    .register-card,
+    .reset-card{
+        padding:24px;
+        border-radius:20px;
+    }
+
+    .password-row{
+        grid-template-columns:1fr;
+    }
+
+    .nav-right{
+        display:none;
+    }
+
+    .login-box h1,
+    .login-box h2,
+    .register-card h1,
+    .reset-card h1{
+        font-size:28px;
+    }
+
+    .btn{
+        height:50px;
+        font-size:15px;
+    }
+
+}
+
+body::before,
+body::after{
+    pointer-events:none;
+}
+
+a{
+    position:relative;
+    z-index:999;
+    pointer-events:auto;
+    cursor:pointer;
+}
