@@ -472,6 +472,66 @@ while($row = mysqli_fetch_assoc($history_query)){
             display: block;
         }
 
+        /* ===== PAGINATION ===== */
+        .pagination-wrap {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 18px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .pagination-info {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pagination button {
+            min-width: 34px;
+            height: 34px;
+            padding: 0 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.04);
+            color: var(--muted);
+            font-size: 13px;
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: rgba(117,255,67,0.1);
+            color: var(--primary);
+            border-color: rgba(117,255,67,0.3);
+        }
+
+        .pagination button.active {
+            background: rgba(117,255,67,0.15);
+            color: var(--primary);
+            border-color: rgba(117,255,67,0.4);
+            font-weight: 600;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .pagination .dots {
+            color: var(--muted);
+            font-size: 13px;
+            padding: 0 4px;
+            line-height: 34px;
+        }
+
         /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
             .dashboard {
@@ -613,7 +673,7 @@ while($row = mysqli_fetch_assoc($history_query)){
         <div class="history-section">
             <div class="history-header">
                 <h3><i class="fa-solid fa-clock-rotate-left"></i> Sorting History</h3>
-                <span class="badge-count">
+                <span class="badge-count" id="historyBadge">
                     <i class="fa-regular fa-circle-dot"></i> Live from ESP32
                 </span>
             </div>
@@ -632,37 +692,22 @@ while($row = mysqli_fetch_assoc($history_query)){
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <?php if(empty($history_data)): ?>
-                            <tr>
-                                <td colspan="7">
-                                    <div class="empty-state">
-                                        <i class="fa-regular fa-clock"></i>
-                                        Belum ada data dari ESP32
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php else: ?>
-                            <?php $no = 1; foreach($history_data as $row): 
-                                $isMerah = strtoupper($row['warna']) === 'MERAH';
-                            ?>
-                            <tr>
-                                <td><?php echo $no++; ?></td>
-                                <td>
-                                    <span class="color-dot <?php echo $isMerah ? 'dot-merah' : 'dot-hijau'; ?>"></span>
-                                    <span class="<?php echo $isMerah ? 'text-merah' : 'text-hijau'; ?>">
-                                        <?php echo $isMerah ? '🔴 Merah' : '🟢 Hijau'; ?>
-                                    </span>
-                                </td>
-                                <td><?php echo $row['r']; ?></td>
-                                <td><?php echo $row['g']; ?></td>
-                                <td><?php echo $row['b']; ?></td>
-                                <td><?php echo number_format($row['berat'], 2); ?> g</td>
-                                <td><?php echo date('H:i:s', strtotime($row['created_at'])); ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                        <tr>
+                            <td colspan="7">
+                                <div class="empty-state">
+                                    <i class="fa-solid fa-spinner fa-spin"></i>
+                                    Memuat data...
+                                </div>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination-wrap">
+                <div class="pagination-info" id="paginationInfo">-</div>
+                <div class="pagination" id="paginationControls"></div>
             </div>
         </div>
     </div>
@@ -670,62 +715,72 @@ while($row = mysqli_fetch_assoc($history_query)){
 
 <!-- ===== JAVASCRIPT ===== -->
 <script>
-    // Auto refresh data setiap 3 detik
+    const LIMIT = 10;
+    let currentPage = 1;
+    let totalPages  = 1;
+    let isOnPage1   = true;
+
+    // ===== FETCH SENSOR STATS =====
     function fetchSensorData() {
         fetch('../api/get_sensor_data.php')
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
-                if(data.status === 'success'){
-                    // Update cards
-                    document.getElementById('totalMerah').innerHTML = data.total_merah + ' <span class="unit">biji</span>';
-                    document.getElementById('totalHijau').innerHTML = data.total_hijau + ' <span class="unit">biji</span>';
+                if (data.status === 'success') {
+                    document.getElementById('totalMerah').innerHTML  = data.total_merah  + ' <span class="unit">biji</span>';
+                    document.getElementById('totalHijau').innerHTML  = data.total_hijau  + ' <span class="unit">biji</span>';
                     document.getElementById('totalSortir').innerHTML = data.total_sortir + ' <span class="unit">biji</span>';
-                    
-                    // Update status
                     document.getElementById('lastUpdate').textContent = 'Last update: ' + data.last_update;
-                    document.getElementById('statusDot').className = 'status-dot';
+                    document.getElementById('statusDot').className   = 'status-dot';
                     document.getElementById('statusLabel').textContent = 'ESP32 Online';
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('statusDot').className = 'status-dot offline';
+            .catch(() => {
+                document.getElementById('statusDot').className    = 'status-dot offline';
                 document.getElementById('statusLabel').textContent = 'ESP32 Offline';
             });
     }
 
-    // Refresh history table
-    function refreshHistory() {
-        fetch('../api/get_history.php')
-            .then(response => response.json())
+    // ===== FETCH HISTORY =====
+    function fetchHistory(page, silent = false) {
+        if (!silent) {
+            document.getElementById('historyTable').innerHTML = `
+                <tr><td colspan="7">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Memuat data...
+                    </div>
+                </td></tr>`;
+        }
+
+        fetch(`../api/get_history.php?page=${page}&limit=${LIMIT}`)
+            .then(r => r.json())
             .then(data => {
-                if(data.status === 'success'){
-                    const tbody = document.getElementById('historyTable');
-                    
-                    if(data.data.length === 0){
-                        tbody.innerHTML = `
+                if (data.status !== 'success') return;
+
+                const p     = data.pagination;
+                currentPage = p.page;
+                totalPages  = p.total_pages;
+                isOnPage1   = currentPage === 1;
+
+                const tbody = document.getElementById('historyTable');
+                const start = (p.page - 1) * p.limit;
+
+                if (data.data.length === 0) {
+                    tbody.innerHTML = `
+                        <tr><td colspan="7">
+                            <div class="empty-state">
+                                <i class="fa-regular fa-clock"></i>
+                                Belum ada data dari ESP32
+                            </div>
+                        </td></tr>`;
+                } else {
+                    tbody.innerHTML = data.data.map((row, i) => {
+                        const isMerah      = row.warna.toUpperCase() === 'MERAH';
+                        const colorClass   = isMerah ? 'dot-merah'  : 'dot-hijau';
+                        const textClass    = isMerah ? 'text-merah' : 'text-hijau';
+                        const warnaDisplay = isMerah ? '🔴 Merah'   : '🟢 Hijau';
+                        return `
                             <tr>
-                                <td colspan="7">
-                                    <div class="empty-state">
-                                        <i class="fa-regular fa-clock"></i>
-                                        Belum ada data dari ESP32
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
-                        return;
-                    }
-                    
-                    tbody.innerHTML = '';
-                    data.data.forEach((row, index) => {
-                        const isMerah    = row.warna.toUpperCase() === 'MERAH';
-                        const colorClass = isMerah ? 'dot-merah' : 'dot-hijau';
-                        const textClass  = isMerah ? 'text-merah' : 'text-hijau';
-                        const warnaDisplay = isMerah ? '🔴 Merah' : '🟢 Hijau';
-                        
-                        tbody.innerHTML += `
-                            <tr>
-                                <td>${index + 1}</td>
+                                <td>${start + i + 1}</td>
                                 <td>
                                     <span class="color-dot ${colorClass}"></span>
                                     <span class="${textClass}">${warnaDisplay}</span>
@@ -735,21 +790,102 @@ while($row = mysqli_fetch_assoc($history_query)){
                                 <td>${row.b}</td>
                                 <td>${Number(row.berat).toFixed(2)} g</td>
                                 <td>${row.created_at}</td>
-                            </tr>
-                        `;
-                    });
+                            </tr>`;
+                    }).join('');
                 }
+
+                // Update info
+                const from = p.total_data === 0 ? 0 : start + 1;
+                const to   = Math.min(start + p.limit, p.total_data);
+                document.getElementById('paginationInfo').textContent =
+                    `Menampilkan ${from}–${to} dari ${p.total_data} data`;
+
+                document.getElementById('historyBadge').innerHTML =
+                    `<i class="fa-regular fa-circle-dot"></i> ${p.total_data} data total`;
+
+                renderPagination(p.page, p.total_pages);
             })
-            .catch(error => console.error('Error:', error));
+            .catch(() => {
+                document.getElementById('historyTable').innerHTML = `
+                    <tr><td colspan="7">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            Gagal memuat data
+                        </div>
+                    </td></tr>`;
+            });
     }
 
-    // Initial fetch
-    fetchSensorData();
-    refreshHistory();
+    // ===== RENDER PAGINATION BUTTONS =====
+    function renderPagination(page, total) {
+        const wrap = document.getElementById('paginationControls');
+        if (total <= 1) { wrap.innerHTML = ''; return; }
 
-    // Auto refresh every 5 seconds
+        let html = '';
+
+        // Prev
+        html += `<button onclick="goPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
+                    <i class="fa-solid fa-chevron-left"></i>
+                 </button>`;
+
+        // Page numbers dengan dots
+        const pages = pageRange(page, total);
+        pages.forEach(p => {
+            if (p === '...') {
+                html += `<span class="dots">…</span>`;
+            } else {
+                html += `<button onclick="goPage(${p})" class="${p === page ? 'active' : ''}">${p}</button>`;
+            }
+        });
+
+        // Next
+        html += `<button onclick="goPage(${page + 1})" ${page === total ? 'disabled' : ''}>
+                    <i class="fa-solid fa-chevron-right"></i>
+                 </button>`;
+
+        wrap.innerHTML = html;
+    }
+
+    // Buat array nomor halaman dengan dots (misal: 1 2 3 ... 8 9 10)
+    function pageRange(current, total) {
+        if (total <= 7) return Array.from({length: total}, (_, i) => i + 1);
+
+        const pages = [];
+        if (current <= 4) {
+            for (let i = 1; i <= 5; i++) pages.push(i);
+            pages.push('...');
+            pages.push(total);
+        } else if (current >= total - 3) {
+            pages.push(1);
+            pages.push('...');
+            for (let i = total - 4; i <= total; i++) pages.push(i);
+        } else {
+            pages.push(1);
+            pages.push('...');
+            for (let i = current - 1; i <= current + 1; i++) pages.push(i);
+            pages.push('...');
+            pages.push(total);
+        }
+        return pages;
+    }
+
+    function goPage(page) {
+        if (page < 1 || page > totalPages) return;
+        fetchHistory(page);
+    }
+
+    // ===== AUTO REFRESH =====
+    // Stats refresh tiap 5 detik
     setInterval(fetchSensorData, 5000);
-    setInterval(refreshHistory, 10000);
+
+    // History: jika user di halaman 1, refresh otomatis tiap 10 detik (silent)
+    setInterval(() => {
+        if (isOnPage1) fetchHistory(1, true);
+    }, 10000);
+
+    // Initial load
+    fetchSensorData();
+    fetchHistory(1);
 </script>
 
 </body>
