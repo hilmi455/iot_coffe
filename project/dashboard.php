@@ -14,33 +14,28 @@ require_once __DIR__ . '/../config/config.php';
 $fullname = $_SESSION['username'] ?? 'User';
 $email = $_SESSION['email'] ?? '';
 
-// Ambil data real-time dari sensor_data
-$sensor_query = mysqli_query($conn, "SELECT * FROM sensor_data WHERE id = 1");
-$sensor_data = mysqli_fetch_assoc($sensor_query);
+// Hitung total langsung dari sensor_logs
+$stats_query = mysqli_query($conn, "
+    SELECT
+        COUNT(*)             AS total_sortir,
+        SUM(warna = 'MERAH') AS total_merah,
+        SUM(warna = 'HIJAU') AS total_hijau,
+        SUM(berat)           AS total_berat
+    FROM sensor_logs
+");
+$stats = mysqli_fetch_assoc($stats_query);
 
-// Jika belum ada data, set default
-if(!$sensor_data){
-    $sensor_data = [
-        'total_merah' => 0,
-        'total_hijau' => 0,
-        'total_sortir' => 0,
-        'berat' => 0,
-        'updated_at' => date('Y-m-d H:i:s')
-    ];
-}
+$total_merah  = (int)($stats['total_merah']  ?? 0);
+$total_hijau  = (int)($stats['total_hijau']  ?? 0);
+$total_sortir = (int)($stats['total_sortir'] ?? 0);
+$total_berat  = round((float)($stats['total_berat'] ?? 0), 2);
 
 // Ambil history dari sensor_logs (10 data terakhir)
-$history_query = mysqli_query($conn, "SELECT * FROM sensor_logs ORDER BY created_at DESC LIMIT 10");
+$history_query = mysqli_query($conn, "SELECT id, warna, r, g, b, berat, created_at FROM sensor_logs ORDER BY created_at DESC LIMIT 10");
 $history_data = [];
 while($row = mysqli_fetch_assoc($history_query)){
     $history_data[] = $row;
 }
-
-// Hitung total keseluruhan
-$total_merah = $sensor_data['total_merah'] ?? 0;
-$total_hijau = $sensor_data['total_hijau'] ?? 0;
-$total_sortir = $sensor_data['total_sortir'] ?? 0;
-$total_berat = $sensor_data['berat'] ?? 0;
 ?>
 
 <!DOCTYPE html>
@@ -368,14 +363,17 @@ $total_berat = $sensor_data['berat'] ?? 0;
         }
 
         .card-red .card-value { color: #ff4d4d; }
-        .card-orange .card-value { color: orange; }
-        .card-green .card-value { color: var(--primary); }
+        .card-hijau .card-value { color: var(--primary); }
         .card-blue .card-value { color: #00d2ff; }
 
         .card-red .card-header i { color: #ff4d4d; opacity: 0.7; }
-        .card-orange .card-header i { color: orange; opacity: 0.7; }
-        .card-green .card-header i { color: var(--primary); opacity: 0.7; }
+        .card-hijau .card-header i { color: var(--primary); opacity: 0.7; }
         .card-blue .card-header i { color: #00d2ff; opacity: 0.7; }
+
+        .badge-merah {
+            background: rgba(255,77,77,0.15);
+            color: #ff4d4d;
+        }
 
         /* ===== HISTORY TABLE ===== */
         .history-section {
@@ -455,11 +453,11 @@ $total_berat = $sensor_data['berat'] ?? 0;
             margin-right: 8px;
         }
 
-        .dot-orange { background: orange; }
-        .dot-green { background: var(--primary); }
+        .dot-merah { background: #ff4d4d; }
+        .dot-hijau { background: var(--primary); }
 
-        .text-orange { color: orange; }
-        .text-green { color: var(--primary); }
+        .text-merah { color: #ff4d4d; }
+        .text-hijau { color: var(--primary); }
 
         .empty-state {
             text-align: center;
@@ -574,28 +572,28 @@ $total_berat = $sensor_data['berat'] ?? 0;
 
         <!-- Sensor Cards -->
         <div class="cards">
-            <div class="card card-orange">
+            <div class="card card-red">
                 <div class="card-header">
-                    <span>🟠 Orange Beans</span>
-                    <i class="fa-solid fa-circle" style="color:orange;"></i>
+                    <span>🔴 Biji Merah</span>
+                    <i class="fa-solid fa-circle" style="color:#ff4d4d;"></i>
                 </div>
                 <div class="card-value" id="totalMerah">
                     <?php echo number_format($total_merah); ?>
                     <span class="unit">biji</span>
                 </div>
-                <span class="card-badge badge-orange">Grade A</span>
+                <span class="card-badge badge-merah">Merah</span>
             </div>
 
-            <div class="card card-green">
+            <div class="card card-hijau">
                 <div class="card-header">
-                    <span>🟢 Green Beans</span>
+                    <span>🟢 Biji Hijau</span>
                     <i class="fa-solid fa-circle" style="color:#75ff43;"></i>
                 </div>
                 <div class="card-value" id="totalHijau">
                     <?php echo number_format($total_hijau); ?>
                     <span class="unit">biji</span>
                 </div>
-                <span class="card-badge badge-green">Reject</span>
+                <span class="card-badge badge-green">Hijau</span>
             </div>
 
             <div class="card card-blue">
@@ -629,8 +627,6 @@ $total_berat = $sensor_data['berat'] ?? 0;
                             <th>R</th>
                             <th>G</th>
                             <th>B</th>
-                            <th>Total Oranye</th>
-                            <th>Total Hijau</th>
                             <th>Berat</th>
                             <th>Waktu</th>
                         </tr>
@@ -638,7 +634,7 @@ $total_berat = $sensor_data['berat'] ?? 0;
                     <tbody id="historyTable">
                         <?php if(empty($history_data)): ?>
                             <tr>
-                                <td colspan="9">
+                                <td colspan="7">
                                     <div class="empty-state">
                                         <i class="fa-regular fa-clock"></i>
                                         Belum ada data dari ESP32
@@ -646,21 +642,21 @@ $total_berat = $sensor_data['berat'] ?? 0;
                                 </td>
                             </tr>
                         <?php else: ?>
-                            <?php $no = 1; foreach($history_data as $row): ?>
+                            <?php $no = 1; foreach($history_data as $row): 
+                                $isMerah = strtoupper($row['warna']) === 'MERAH';
+                            ?>
                             <tr>
                                 <td><?php echo $no++; ?></td>
                                 <td>
-                                    <span class="color-dot <?php echo $row['warna'] == 'oranye' ? 'dot-orange' : 'dot-green'; ?>"></span>
-                                    <span class="<?php echo $row['warna'] == 'oranye' ? 'text-orange' : 'text-green'; ?>">
-                                        <?php echo $row['warna'] == 'oranye' ? '🟠 Oranye' : '🟢 Hijau'; ?>
+                                    <span class="color-dot <?php echo $isMerah ? 'dot-merah' : 'dot-hijau'; ?>"></span>
+                                    <span class="<?php echo $isMerah ? 'text-merah' : 'text-hijau'; ?>">
+                                        <?php echo $isMerah ? '🔴 Merah' : '🟢 Hijau'; ?>
                                     </span>
                                 </td>
                                 <td><?php echo $row['r']; ?></td>
                                 <td><?php echo $row['g']; ?></td>
                                 <td><?php echo $row['b']; ?></td>
-                                <td><?php echo number_format($row['total_merah']); ?></td>
-                                <td><?php echo number_format($row['total_hijau']); ?></td>
-                                <td><?php echo number_format($row['berat'], 2); ?> kg</td>
+                                <td><?php echo number_format($row['berat'], 2); ?> g</td>
                                 <td><?php echo date('H:i:s', strtotime($row['created_at'])); ?></td>
                             </tr>
                             <?php endforeach; ?>
@@ -676,7 +672,7 @@ $total_berat = $sensor_data['berat'] ?? 0;
 <script>
     // Auto refresh data setiap 3 detik
     function fetchSensorData() {
-        fetch('api/get_sensor_data.php')
+        fetch('../api/get_sensor_data.php')
             .then(response => response.json())
             .then(data => {
                 if(data.status === 'success'){
@@ -700,7 +696,7 @@ $total_berat = $sensor_data['berat'] ?? 0;
 
     // Refresh history table
     function refreshHistory() {
-        fetch('api/get_history.php')
+        fetch('../api/get_history.php')
             .then(response => response.json())
             .then(data => {
                 if(data.status === 'success'){
@@ -709,7 +705,7 @@ $total_berat = $sensor_data['berat'] ?? 0;
                     if(data.data.length === 0){
                         tbody.innerHTML = `
                             <tr>
-                                <td colspan="9">
+                                <td colspan="7">
                                     <div class="empty-state">
                                         <i class="fa-regular fa-clock"></i>
                                         Belum ada data dari ESP32
@@ -722,9 +718,10 @@ $total_berat = $sensor_data['berat'] ?? 0;
                     
                     tbody.innerHTML = '';
                     data.data.forEach((row, index) => {
-                        const colorClass = row.warna === 'oranye' ? 'dot-orange' : 'dot-green';
-                        const textClass = row.warna === 'oranye' ? 'text-orange' : 'text-green';
-                        const warnaDisplay = row.warna === 'oranye' ? '🟠 Oranye' : '🟢 Hijau';
+                        const isMerah    = row.warna.toUpperCase() === 'MERAH';
+                        const colorClass = isMerah ? 'dot-merah' : 'dot-hijau';
+                        const textClass  = isMerah ? 'text-merah' : 'text-hijau';
+                        const warnaDisplay = isMerah ? '🔴 Merah' : '🟢 Hijau';
                         
                         tbody.innerHTML += `
                             <tr>
@@ -736,9 +733,7 @@ $total_berat = $sensor_data['berat'] ?? 0;
                                 <td>${row.r}</td>
                                 <td>${row.g}</td>
                                 <td>${row.b}</td>
-                                <td>${Number(row.total_merah).toLocaleString()}</td>
-                                <td>${Number(row.total_hijau).toLocaleString()}</td>
-                                <td>${Number(row.berat).toFixed(2)} kg</td>
+                                <td>${Number(row.berat).toFixed(2)} g</td>
                                 <td>${row.created_at}</td>
                             </tr>
                         `;

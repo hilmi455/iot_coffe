@@ -1,30 +1,170 @@
 #include <HX711.h>
 
-#define DT2   35
-#define SCK2  22
+// =======================
+// PIN HX711
+// =======================
+#define LOADCELL1_DT   35
+#define LOADCELL1_SCK  22
 
+#define LOADCELL2_DT   32
+#define LOADCELL2_SCK  21
+
+HX711 scale1;
 HX711 scale2;
 
-float calibrationFactor2 = -700.00;
+// =======================
+// FAKTOR KALIBRASI
+// Ganti setelah proses kalibrasi dengan beban diketahui
+// =======================
+float calibration_factor1 = 700.56;   // diperbarui dari hasil uji: (573856 - 503800) / 100
+float calibration_factor2 = 1076.46;  // diperbarui dari hasil uji: (314661 - 207015) / 100
+
+long offset1 = 0;
+long offset2 = 0;
+
+// =======================
+// THRESHOLD NOISE
+// Berat di bawah nilai ini dianggap 0 (kosong)
+// Sesuaikan jika masih ada noise saat kosong
+// =======================
+const float NOISE_THRESHOLD = 0.5;  // gram
+
+// =======================
+// ROLLING AVERAGE
+// Semakin besar = semakin halus tapi semakin lambat
+// =======================
+const int ROLLING_SIZE = 5;
+float history1[ROLLING_SIZE];
+float history2[ROLLING_SIZE];
+int historyIndex = 0;
+bool historyFull = false;
+
+// =======================
+
+float rollingAverage(float* arr, float newVal) {
+    arr[historyIndex] = newVal;
+    int count = historyFull ? ROLLING_SIZE : (historyIndex + 1);
+    float sum = 0;
+    for (int i = 0; i < count; i++) sum += arr[i];
+    return sum / count;
+}
 
 void setup() {
-  Serial.begin(115200);
 
-  scale2.begin(DT2, SCK2);
+    Serial.begin(115200);
 
-  delay(3000);
+    Serial.println();
+    Serial.println("==================================");
+    Serial.println(" Dual HX711 ESP32 - v2");
+    Serial.println("==================================");
 
-  scale2.tare();                 // nol otomatis
-  scale2.set_scale(calibrationFactor2);
+    scale1.begin(LOADCELL1_DT, LOADCELL1_SCK);
+    scale2.begin(LOADCELL2_DT, LOADCELL2_SCK);
+
+    int t1 = 0;
+    while (!scale1.is_ready() && t1 < 20) {
+        Serial.println("HX711 1 belum terdeteksi...");
+        delay(500);
+        t1++;
+    }
+
+    int t2 = 0;
+    while (!scale2.is_ready() && t2 < 20) {
+        Serial.println("HX711 2 belum terdeteksi...");
+        delay(500);
+        t2++;
+    }
+
+    if (!scale1.is_ready()) {
+        Serial.println("❌ LC1 GAGAL terdeteksi!");
+    } else {
+        Serial.println("✅ LC1 terdeteksi");
+    }
+
+    if (!scale2.is_ready()) {
+        Serial.println("❌ LC2 GAGAL terdeteksi!");
+    } else {
+        Serial.println("✅ LC2 terdeteksi");
+    }
+
+    // Warm-up: buang 50 pembacaan pertama (tidak stabil)
+    Serial.println();
+    Serial.println("⏳ Warm-up load cell (tunggu ~5 detik)...");
+    for (int i = 0; i < 50; i++) {
+        if (scale1.is_ready()) scale1.read();
+        if (scale2.is_ready()) scale2.read();
+        delay(100);
+    }
+
+    // TARE dengan 100 sample (lebih akurat)
+    Serial.println("⚖️  Melakukan TARE (100 sample)...");
+    delay(500);
+
+    if (scale1.is_ready()) {
+        offset1 = scale1.read_average(100);
+        Serial.print("  Offset LC1 : ");
+        Serial.println(offset1);
+    }
+
+    if (scale2.is_ready()) {
+        offset2 = scale2.read_average(100);
+        Serial.print("  Offset LC2 : ");
+        Serial.println(offset2);
+    }
+
+    // Init rolling average buffer dengan 0
+    for (int i = 0; i < ROLLING_SIZE; i++) {
+        history1[i] = 0;
+        history2[i] = 0;
+    }
+
+    Serial.println("✅ TARE selesai");
+    Serial.println();
+    Serial.print("  Noise threshold : ");
+    Serial.print(NOISE_THRESHOLD);
+    Serial.println(" gram");
+    Serial.print("  Rolling avg size: ");
+    Serial.println(ROLLING_SIZE);
+    Serial.println();
 }
 
 void loop() {
 
-  float berat2 = scale2.get_units(10);
+    long raw1 = scale1.is_ready() ? scale1.read_average(20) : offset1;
+    long raw2 = scale2.is_ready() ? scale2.read_average(20) : offset2;
 
-  Serial.print("LC2 : ");
-  Serial.print(berat2, 2);
-  Serial.println(" g");
+    // Hitung berat mentah (abs agar tidak peduli arah pasang fisik)
+    float raw_berat1 = abs((float)(raw1 - offset1)) / calibration_factor1;
+    float raw_berat2 = abs((float)(raw2 - offset2)) / calibration_factor2;
 
-  delay(500);
+    // Clamp negatif ke 0
+    if (raw_berat1 < 0) raw_berat1 = 0;
+    if (raw_berat2 < 0) raw_berat2 = 0;
+
+    // Rolling average untuk haluskan noise
+    float berat1 = rollingAverage(history1, raw_berat1);
+    float berat2 = rollingAverage(history2, raw_berat2);
+
+    // Update index
+    historyIndex = (historyIndex + 1) % ROLLING_SIZE;
+    if (historyIndex == 0) historyFull = true;
+
+    // Terapkan threshold: di bawah NOISE_THRESHOLD dianggap 0
+    float berat1_final = (berat1 < NOISE_THRESHOLD) ? 0.00 : berat1;
+    float berat2_final = (berat2 < NOISE_THRESHOLD) ? 0.00 : berat2;
+
+    Serial.println("========================================");
+    Serial.print("LC1 RAW    : "); Serial.println(raw1);
+    Serial.print("LC1 Mentah : "); Serial.print(raw_berat1, 2); Serial.println(" gram");
+    Serial.print("LC1 Avg    : "); Serial.print(berat1, 2);     Serial.println(" gram");
+    Serial.print("LC1 FINAL  : "); Serial.print(berat1_final, 2); Serial.println(" gram  ← pakai ini");
+    Serial.println("----------------------------------------");
+    Serial.print("LC2 RAW    : "); Serial.println(raw2);
+    Serial.print("LC2 Mentah : "); Serial.print(raw_berat2, 2); Serial.println(" gram");
+    Serial.print("LC2 Avg    : "); Serial.print(berat2, 2);     Serial.println(" gram");
+    Serial.print("LC2 FINAL  : "); Serial.print(berat2_final, 2); Serial.println(" gram  ← pakai ini");
+    Serial.println("========================================");
+    Serial.println();
+
+    delay(500);
 }

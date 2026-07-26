@@ -1,0 +1,182 @@
+#include <Arduino.h>
+#include <math.h>
+
+//==================================================
+// TCS3200
+//==================================================
+#define S0 14
+#define S1 27
+#define S2 26
+#define S3 25
+#define SENSOR_OUT 33
+
+//==================================================
+// REFERENSI HASIL KALIBRASI (% RGB)
+//==================================================
+
+// Normal 1 (servo tidak di bawah sensor)
+const float N1_R = 26.53;
+const float N1_G = 34.06;
+const float N1_B = 39.41;
+
+// Normal 2 (servo tepat di bawah sensor)
+const float N2_R = 26.41;
+const float N2_G = 33.61;
+const float N2_B = 39.98;
+
+// Biji Merah
+const float MR_R = 26.29;
+const float MR_G = 33.51;
+const float MR_B = 40.20;
+
+// Biji Hijau
+const float HJ_R = 26.22;
+const float HJ_G = 32.56;
+const float HJ_B = 41.22;
+
+//==================================================
+// Membaca warna
+//==================================================
+long readColor(bool s2, bool s3)
+{
+  digitalWrite(S2, s2);
+  digitalWrite(S3, s3);
+
+  delay(5);
+
+  long total = 0;
+
+  for (int i = 0; i < 10; i++)
+  {
+    total += pulseIn(SENSOR_OUT, LOW, 100000);
+  }
+
+  return total / 10;
+}
+
+//==================================================
+// Hitung Euclidean Distance
+//==================================================
+float distanceRGB(float r1, float g1, float b1,
+                  float r2, float g2, float b2)
+{
+  return sqrt(
+      pow(r1 - r2, 2) +
+      pow(g1 - g2, 2) +
+      pow(b1 - b2, 2));
+}
+
+void setup()
+{
+  Serial.begin(115200);
+
+  pinMode(S0, OUTPUT);
+  pinMode(S1, OUTPUT);
+  pinMode(S2, OUTPUT);
+  pinMode(S3, OUTPUT);
+  pinMode(SENSOR_OUT, INPUT);
+
+  // Output frequency 20%
+  digitalWrite(S0, HIGH);
+  digitalWrite(S1, LOW);
+
+  Serial.println();
+  Serial.println("===============================================");
+  Serial.println("      TCS3200 AUTO CLASSIFICATION");
+  Serial.println("===============================================");
+}
+
+void loop()
+{
+  //------------------------------------------------
+  // Baca RAW
+  //------------------------------------------------
+  long red = readColor(LOW, LOW);
+  long blue = readColor(LOW, HIGH);
+  long green = readColor(HIGH, HIGH);
+
+  //------------------------------------------------
+  // Persentase
+  //------------------------------------------------
+  float total = red + green + blue;
+
+  float r = (red * 100.0) / total;
+  float g = (green * 100.0) / total;
+  float b = (blue * 100.0) / total;
+
+  //------------------------------------------------
+  // Hitung jarak
+  //------------------------------------------------
+  float dN1 = distanceRGB(r, g, b, N1_R, N1_G, N1_B);
+  float dN2 = distanceRGB(r, g, b, N2_R, N2_G, N2_B);
+  float dMR = distanceRGB(r, g, b, MR_R, MR_G, MR_B);
+  float dHJ = distanceRGB(r, g, b, HJ_R, HJ_G, HJ_B);
+
+  //------------------------------------------------
+  // Cari jarak terkecil
+  //------------------------------------------------
+  float minDist = dN1;
+  String hasil = "NORMAL 1";
+
+  if (dN2 < minDist)
+  {
+    minDist = dN2;
+    hasil = "NORMAL 2";
+  }
+
+  if (dMR < minDist)
+  {
+    minDist = dMR;
+    hasil = "BIJI MERAH";
+  }
+
+  if (dHJ < minDist)
+  {
+    minDist = dHJ;
+    hasil = "BIJI HIJAU";
+  }
+
+  //------------------------------------------------
+  // Tampilkan
+  //------------------------------------------------
+  Serial.println("------------------------------------------------");
+
+  Serial.print("RAW R : ");
+  Serial.print(red);
+
+  Serial.print(" | G : ");
+  Serial.print(green);
+
+  Serial.print(" | B : ");
+  Serial.println(blue);
+
+  Serial.print("R% : ");
+  Serial.print(r, 2);
+
+  Serial.print(" | G% : ");
+  Serial.print(g, 2);
+
+  Serial.print(" | B% : ");
+  Serial.println(b, 2);
+
+  Serial.println();
+
+  Serial.print("Distance NORMAL 1 : ");
+  Serial.println(dN1, 4);
+
+  Serial.print("Distance NORMAL 2 : ");
+  Serial.println(dN2, 4);
+
+  Serial.print("Distance MERAH    : ");
+  Serial.println(dMR, 4);
+
+  Serial.print("Distance HIJAU    : ");
+  Serial.println(dHJ, 4);
+
+  Serial.println();
+
+  Serial.print("HASIL : ");
+  Serial.println(hasil);
+
+  delay(500);
+}
